@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>snipes</title>
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    .back-link {
+      font-size: 0.9rem;
+      color: #999;
+      text-decoration: none;
+      align-self: flex-start;
+    }
+    .back-link:hover { color: #111; }
+
+    .gallery-name {
+      font-size: 1.6rem;
+      font-weight: 400;
+    }
+
+    .gallery-count {
+      font-size: 0.9rem;
+      color: #999;
+    }
+
+    .gallery-grid {
+      width: 100%;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 4px;
+    }
+
+    .gallery-grid img {
+      width: 100%;
+      aspect-ratio: 1;
+      object-fit: cover;
+      background: #eee;
+      cursor: pointer;
+      transition: opacity 0.2s;
+    }
+
+    .gallery-grid img:hover { opacity: 0.8; }
+
+    .gallery-empty {
+      color: #aaa;
+      font-size: 0.9rem;
+      margin-top: 1rem;
+    }
+
+    .lightbox {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.85);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+    }
+
+    .lightbox.open { display: flex; }
+
+    .lightbox img {
+      max-width: 90vw;
+      max-height: 90vh;
+      object-fit: contain;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <a class="back-link" href="index.html">&larr; back</a>
+    <h1>snipes</h1>
+    <p class="gallery-name" id="galleryName"></p>
+    <p class="gallery-count" id="galleryCount"></p>
+    <div class="gallery-grid" id="galleryGrid"></div>
+  </div>
+
+  <div class="lightbox" id="lightbox">
+    <img id="lightboxImg" src="" alt="" />
+  </div>
+
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
+  <script src="firebase.js"></script>
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const snipeeKey = params.get("name");
+    const displayName = params.get("display") || snipeeKey;
+
+    const galleryName = document.getElementById("galleryName");
+    const galleryCount = document.getElementById("galleryCount");
+    const galleryGrid = document.getElementById("galleryGrid");
+    const lightbox = document.getElementById("lightbox");
+    const lightboxImg = document.getElementById("lightboxImg");
+
+    if (!snipeeKey) {
+      galleryName.textContent = "no snipee specified.";
+    } else {
+      document.title = `snipes — ${displayName}`;
+      galleryName.textContent = displayName;
+      galleryGrid.innerHTML = '<p class="gallery-empty">loading photos...</p>';
+
+      getSnipePhotos(snipeeKey)
+        .then((photos) => {
+        galleryCount.textContent = `sniped ${photos.length} time${photos.length !== 1 ? "s" : ""}`;
+
+        if (photos.length === 0) {
+          galleryGrid.innerHTML = '<p class="gallery-empty">no photos yet.</p>';
+          return;
+        }
+
+        galleryGrid.innerHTML = photos
+          .map((p) => `<img src="${p.imageUrl}" alt="" loading="lazy" />`)
+          .join("");
+        })
+        .catch((err) => {
+          console.error("gallery load failed:", err);
+          galleryCount.textContent = "";
+          galleryGrid.innerHTML = '<p class="gallery-empty">could not load photos.</p>';
+        });
+    }
+
+    galleryGrid.addEventListener("click", (e) => {
+      if (e.target.tagName === "IMG") {
+        lightboxImg.src = e.target.src;
+        lightbox.classList.add("open");
+      }
+    });
+
+    lightbox.addEventListener("click", () => {
+      lightbox.classList.remove("open");
+      lightboxImg.src = "";
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>snipes</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="container">
+    <h1>snipes</h1>
+
+    <div class="upload-box" id="uploadBox">
+      <p>tap to upload<br />or drag &amp; drop</p>
+      <input type="file" accept="image/*" capture="environment" id="fileInput" />
+    </div>
+
+    <input
+      type="text"
+      class="name-input"
+      id="nameInput"
+      placeholder="who got sniped?"
+      maxlength="30"
+    />
+
+    <button class="submit-btn" id="submitBtn" disabled>submit</button>
+
+    <p class="status-msg" id="statusMsg"></p>
+
+    <div class="divider">leaderboard</div>
+
+    <div class="leaderboard" id="leaderboard"></div>
+  </div>
+
+  <!-- Firebase SDKs (compat for simplicity) -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
+  <script src="firebase.js"></script>
+  <script>
+    const uploadBox = document.getElementById("uploadBox");
+    const fileInput = document.getElementById("fileInput");
+    const nameInput = document.getElementById("nameInput");
+    const submitBtn = document.getElementById("submitBtn");
+    const statusMsg = document.getElementById("statusMsg");
+    const leaderboard = document.getElementById("leaderboard");
+
+    let selectedFile = null;
+
+    function updateSubmitState() {
+      submitBtn.disabled = !(selectedFile && nameInput.value.trim());
+    }
+
+    function showPreview(file) {
+      selectedFile = file;
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        let img = uploadBox.querySelector("img");
+        if (!img) {
+          img = document.createElement("img");
+          uploadBox.appendChild(img);
+        }
+        img.src = e.target.result;
+        uploadBox.classList.add("has-image");
+      };
+      reader.readAsDataURL(file);
+      updateSubmitState();
+    }
+
+    // Click to upload
+    uploadBox.addEventListener("click", () => fileInput.click());
+    fileInput.addEventListener("change", (e) => {
+      if (e.target.files[0]) showPreview(e.target.files[0]);
+    });
+
+    // Drag & drop
+    uploadBox.addEventListener("dragover", (e) => {
+      e.preventDefault();
+      uploadBox.classList.add("dragover");
+    });
+    uploadBox.addEventListener("dragleave", () =>
+      uploadBox.classList.remove("dragover")
+    );
+    uploadBox.addEventListener("drop", (e) => {
+      e.preventDefault();
+      uploadBox.classList.remove("dragover");
+      if (e.dataTransfer.files[0]) showPreview(e.dataTransfer.files[0]);
+    });
+
+    nameInput.addEventListener("input", updateSubmitState);
+
+    submitBtn.addEventListener("click", async () => {
+      if (!selectedFile || !nameInput.value.trim()) return;
+
+      const name = nameInput.value.trim();
+      submitBtn.disabled = true;
+      statusMsg.textContent = "uploading...";
+      statusMsg.classList.add("loading");
+
+      try {
+
+        const imageUrl = await uploadToStorage(selectedFile, name);
+        await recordSnipe(name, imageUrl);
+
+        statusMsg.textContent = "sniped.";
+        statusMsg.classList.remove("loading");
+        selectedFile = null;
+        fileInput.value = "";
+        nameInput.value = "";
+        const img = uploadBox.querySelector("img");
+        if (img) img.remove();
+        uploadBox.classList.remove("has-image");
+        updateSubmitState();
+      } catch (err) {
+        console.error(err);
+        statusMsg.textContent = "something went wrong. try again.";
+        statusMsg.classList.remove("loading");
+        updateSubmitState();
+      }
+    });
+
+    subscribeToLeaderboard((entries) => {
+      leaderboard.innerHTML = entries
+        .map(
+          (e, i) => `
+        <div class="lb-entry">
+          <span class="lb-rank">${i + 1}.</span>
+          <a class="lb-name" href="gallery.html?name=${encodeURIComponent(e.id)}&display=${encodeURIComponent(e.name)}" target="_blank">${e.name}</a>
+          <span class="lb-count">${e.count}</span>
+          <img class="lb-thumb" src="${e.latestImageUrl}" alt="" loading="lazy" />
+        </div>`
+        )
+        .join("");
+    });
+  </script>
+</body>
+</html>
